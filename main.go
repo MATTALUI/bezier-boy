@@ -7,17 +7,27 @@ import (
 	"golang.org/x/image/colornames"
 	"github.com/faiface/pixel/imdraw"
 	"math"
+	"github.com/faiface/pixel/text"
+  	"golang.org/x/image/font/basicfont"
+	"image/color"
+	"strconv"
 )
 
 const (
-	BEZIER_WINDOW_HEIGHT = 768
-	BEZIER_WINDOW_WIDTH = 1024
-	CONTROL_WINDOW_HEIGHT = 669
-	CONTROL_WINDOW_WIDTH = 500
+	BEZIER_WINDOW_HEIGHT = 768.0
+	BEZIER_WINDOW_WIDTH = 1024.0
+	CONTROL_WINDOW_HEIGHT = 669.0
+	CONTROL_WINDOW_WIDTH = 500.0
 	WINDOW_GAP = 10.0
+	TOP_PADDING = 15.0
+	USABLE_CONTROL_HEIGHT = CONTROL_WINDOW_HEIGHT - TOP_PADDING
 	INIT_X = 69.0
 	INIT_Y = 69.0
 	POINT_RADIUS = 6.9
+	MAX_POINTS = 4.0
+	BASE_TEXT_HEIGHT = 12.0
+	TEXT_HEIGHT =  20.0
+	TEXT_SCALE = TEXT_HEIGHT / BASE_TEXT_HEIGHT
 )
 
 var (
@@ -75,6 +85,11 @@ func Run() {
 }
 
 func Draw() {
+	DrawControls()
+	DrawBezier()
+}
+
+func DrawBezier() {
 	imd := imdraw.New(nil)
 	// Draw Bezier Points
 	imd.Color = colornames.Pink
@@ -142,6 +157,23 @@ func Draw() {
 	imd.Draw(bezierWin)
 }
 
+func DrawControls() {
+	// Display Point Coordinates
+	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
+	availableY := USABLE_CONTROL_HEIGHT
+	for i := 0; i < MAX_POINTS ; i++ {
+		y := float64(USABLE_CONTROL_HEIGHT - (WINDOW_GAP + (i * TEXT_HEIGHT)))
+		availableY = y - WINDOW_GAP
+		if len(state.Points) > i {
+			basicTxt := text.New(pixel.V(WINDOW_GAP, y), atlas)
+			basicTxt.Color = colornames.White
+			fmt.Fprintln(basicTxt, strconv.Itoa(i) + " " + FormatVec(state.Points[i]))
+			basicTxt.Draw(controlWin, pixel.IM.Scaled(basicTxt.Orig, TEXT_SCALE))
+		}
+	}
+	DrawRect(controlWin, colornames.Gray, pixel.V(0, availableY), pixel.V(CONTROL_WINDOW_WIDTH, availableY - 2))
+}
+
 func HandleEvents() {
 	ManageBezierInteractions()
 }
@@ -159,7 +191,7 @@ func ManageBezierInteractions() {
 			}
 		}
 		// Add point if they're available.
-		if !selectedPoint && state.PointLength() < 4 {
+		if !selectedPoint && state.PointLength() < MAX_POINTS {
 			state.AddPoint(mousePos)
 		}
 	}
@@ -201,4 +233,21 @@ func GetTPoints(points []pixel.Vec) []pixel.Vec {
 	}
 
 	return tPoints
+}
+
+func DrawRect(target pixel.Target, c color.Color, p1 pixel.Vec, p2 pixel.Vec) {
+	imd := imdraw.New(nil)
+  
+	imd.Color = c
+	imd.Push(p1)
+	imd.Push(pixel.V(p1.X, p2.Y))
+	imd.Push(p2)
+	imd.Push(pixel.V(p2.X, p1.Y))
+	imd.Polygon(0)
+  
+	imd.Draw(target)
+}
+
+func FormatVec(vec pixel.Vec) string {
+	return fmt.Sprintf("(%f, %f)", vec.X, vec.Y)
 }
